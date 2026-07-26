@@ -115,9 +115,12 @@
             <div class="settings-row-text"><div class="settings-row-title">רוחב הטקסט</div></div>
             <div class="segmented" id="set-width" role="group" aria-label="רוחב הטקסט"></div>
           </div>
-          <div class="settings-row toggle-row">
-            <div class="settings-row-text"><div class="settings-row-title">הצגת השם הקדוש כ״ה׳״</div></div>
-            <button class="switch" id="set-censor" role="switch" aria-label="צנזור שם"></button>
+          <div class="settings-row stacked">
+            <div class="settings-row-text">
+              <div class="settings-row-title">תצוגת שם ה׳</div>
+              <div class="settings-row-subtitle">כיצד יוצג שם הקודש בתפילה</div>
+            </div>
+            <div class="segmented" id="set-divine" role="group" aria-label="תצוגת שם ה׳"></div>
           </div>
         </div>
       </section>
@@ -128,7 +131,7 @@
           <div class="settings-row stacked">
             <div class="settings-row-text">
               <div class="settings-row-title">קיצור דרך לסידורון</div>
-              <div class="settings-row-subtitle">פתיחת התוסף ישירות משולחן העבודה</div>
+              <div class="settings-row-subtitle" id="set-shortcut-note">פתיחת התוסף ישירות משולחן העבודה</div>
             </div>
             <button class="set-action" id="set-shortcut" type="button">צור קיצור דרך בשולחן העבודה</button>
           </div>

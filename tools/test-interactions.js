@@ -32,15 +32,24 @@ setTimeout(async function () {
   check('RC badge shown', /ראש חודש/.test(doc.getElementById('hdr-badges').innerHTML));
   check('omer tab present', /ספירת העומר/.test(doc.getElementById('tabs').textContent));
 
-  // Settings: open + censor toggle
+  // Settings: open + divine-name styles (ה׳ / יְיָ / יְדֹוָד / as written)
   click('btn-settings');
   check('settings panel opened', doc.getElementById('panel-settings').classList.contains('open'));
-  const fullBefore = /יְהֹוָה|יהוה/.test(content());
-  click('set-censor');
-  const censored = content();
-  check('censor: ה׳ appears', /ה׳/.test(censored));
-  check('censor: full tetragrammaton removed', !/יְהֹוָה/.test(censored) && fullBefore);
-  click('set-censor'); // toggle back
+  function pickDivine(v) {
+    const b = doc.querySelector('#set-divine [data-val="' + v + '"]');
+    if (b) b.onclick.call(b);
+    return content();
+  }
+  check('divine-name control rendered', doc.querySelectorAll('#set-divine [data-val]').length === 4);
+  const asWritten = pickDivine('source');
+  check('divine name: source keeps the full Name', /יְהֹוָה/.test(asWritten));
+  const hashem = pickDivine('hashem');
+  check('divine name: ה׳ replaces the Name', /ה׳/.test(hashem) && !/יְהֹוָה/.test(hashem));
+  const twoYods = pickDivine('yy');
+  check('divine name: two yods, vocalised', /יְיָ/.test(twoYods) && !/יְהֹוָה/.test(twoYods));
+  const yedovid = pickDivine('yedovid');
+  check('divine name: ידוד, vocalised', /יְדֹוָד/.test(yedovid) && !/יְהֹוָה/.test(yedovid));
+  pickDivine('yy');
 
   // Close via the ✕ button, then via backdrop.
   doc.querySelector('#panel-settings [data-close]').onclick.call(doc.querySelector('#panel-settings [data-close]'));

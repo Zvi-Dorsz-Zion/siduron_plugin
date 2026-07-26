@@ -41,6 +41,7 @@
     hamelech_hakadosh: 'hamelech_hakadosh', hamelech_hamishpat: 'hamelech_hamishpat',
     mashivHaruach: 'mashiv_haruach', talUmatar: 'tal_umatar', elul: 'elul',
     ladavid_season: 'ladavid_season', erevShabbat: 'erev_shabbat',
+    motzaeiShabbat: 'motzaei_shabbat',
     fast10Tevet: 'fast_10_tevet', fastEsther: 'fast_esther',
     fast17Tammuz: 'fast_17_tammuz', fastGedalia: 'fast_gedalia',
     bahabSheniKama: 'bahab_sheni_kama', bahabChamishi: 'bahab_chamishi',
@@ -424,6 +425,9 @@
     if (m === M.ELUL) f.add(DF.ladavid_season);
     if (m === M.TISHREI && d <= 10) f.add(DF.ladavid_season);
     if (dowMon === 5) f.add(DF.erevShabbat);            // Friday
+    // מוצאי שבת: ערבית של יום ראשון *נכנסת* במוצאי שבת (שבת תמיד קודמת לו),
+    // ולכן אתה חוננתנו / ויהי נועם / הבדלה נגזרים מהיום ולא מהיום שלפניו.
+    if (dowMon === 7) f.add(DF.motzaeiShabbat);         // Sunday
   }
 
   function addPurim(c, ctx, yt, f) {
@@ -464,8 +468,16 @@
         f.has(DF.cholHamoedPesach) || f.has(DF.shavuot) || f.has(DF.isruChag)) skipAll = true;
     if (m === M.TISHREI && d >= 11 && d <= 14) skipAll = true;
     if (m === M.SIVAN && d >= 1 && d <= 12) skipAll = true;
+    // תשעה באב נקרא "מועד", ולכן אין בו נפילת אפים/תחנון, אין למנצח יענך ואין
+    // אבינו מלכנו (רמ״א תקנ״ט) — לא בשחרית ולא במנחה. בקורפוס אבינו מלכנו של
+    // תענית מותנה ב-shacharitTachanun/minchaTachanun, כך שדילוג התחנון מסיר גם
+    // אותו; ה-flag avinu_malkeinu כבר מחריג תשעה באב בנפרד.
+    if (f.has(DF.tishaBaav)) skipAll = true;
     if (f.has(DF.erevShavuot)) skipMinchaOnly = true;
-    if (skipAll) f.add(DF.skipTachanun);
+    // יום שאין בו תחנון בשחרית — אין בו תחנון גם במנחה. ה-flag של המנחה נוסף גם
+    // ב-skipAll, אחרת תג minchaTachanun (שנבדק מול skip_tachanun_mincha בלבד)
+    // היה מציג תחנון ואבינו מלכנו במנחה של ראש חודש, חנוכה, ניסן, תשעה באב וכו'.
+    if (skipAll) { f.add(DF.skipTachanun); f.add(DF.skipTachanunMincha); }
     if (!skipAll && skipMinchaOnly) f.add(DF.skipTachanunMincha);
   }
 

@@ -105,11 +105,11 @@
       // ── יום כיפור ──
       case 'kipur': case 'avinu_malkenu_kipur': return has('yom_kippur');
       // ── מוצאי שבת (ערבית): אתה חוננתנו + ויהי נועם / הבדלה ──
-      // The weekday מעריב here concludes Shabbat when the selected day is שבת
-      // (matches the time-of-day auto-pick: Saturday after sunset → מעריב).
+      // ערבית נאמרת בכניסת היום, ולכן ערבית של מוצאי שבת היא הערבית של יום
+      // ראשון — ראו motzaei_shabbat ב-calendar.js ואת בחירת יום הערבית ב-app.js.
       // TODO: also treat מוצאי יום טוב.
-      case 'chonantanu': case 'havdala': return has('shabbat');
-      case 'noChonantanu': return !has('shabbat');
+      case 'chonantanu': case 'havdala': return has('motzaei_shabbat');
+      case 'noChonantanu': return !has('motzaei_shabbat');
       // ── kedusha wording variants — structural, always present in context ──
       case 'kadosh': case 'em_kadosh': return true;
       // ── personal / optional inserts hidden by default ──
@@ -133,6 +133,140 @@
     var set = {};
     (dayFlags && dayFlags.flags || []).forEach(function (f) { set[f] = true; });
     return function (f) { return !!set[f]; };
+  }
+
+  /* ────────────── תפילה ללא מניין ──────────────
+   * The Tfilon corpus (and the seforim.db Shabbat/Yom-Tov corpora) carry no
+   * "with minyan" condition tag, so the מניין preference has to be applied here.
+   * Whatever needs a מניין of ten is dropped and replaced by one muted note, so
+   * the reader sees *why* a familiar section is missing instead of a silent hole.
+   *
+   * Three rules, in order of reliability:
+   *   1. Section headers that are minyan-only (חזרת הש"ץ, קדושה, קריאת התורה …).
+   *      The skip runs until the next header that is NOT minyan-only — this is
+   *      essential, because the tail of חזרת הש"ץ (שים שלום) sits under the
+   *      ברכת כהנים header, not under a header of its own.
+   *   2. קדיש — the opening line plus the segments continuing it. Continuation
+   *      phrases only count while a קדיש run is open, so "עושה שלום במרומיו"
+   *      at the end of the עמידה is never swallowed.
+   *   3. Lines spoken by the חזן / הקהל (ברכו and its response, וחוזר החזן …),
+   *      plus the "חזן:" / "קהל וחזן:" labels that introduce a dropped line.
+   */
+  // Header text (nikud/quotes stripped) → the label shown in the note.
+  var MINYAN_ONLY_SECTIONS = {
+    'חזרת השץ': 'חזרת הש״ץ',
+    'קדושה': 'קדושה',
+    'מודים דרבנן': 'מודים דרבנן',
+    'ברכת כהנים': 'ברכת כהנים',
+    'הוצאת ספר תורה': 'קריאת התורה',
+    'קריאת התורה': 'קריאת התורה',
+    'סדר קריאת התורה בשבת': 'קריאת התורה',
+    'סדר קריאת התורה': 'קריאת התורה',
+    'הפטרה': 'הפטרה',
+    'ברכות ההפטרה': 'הפטרה',
+    'הכנסת ספר תורה': 'הכנסת ספר תורה',
+    'ברכת הגומל': 'ברכת הגומל',
+    'הכרזת ראש חדש': 'הכרזת ראש חודש',
+    'הכרזת תענית': 'הכרזת תענית',
+    'מי שברך לקהל': 'מי שברך לקהל',
+    'סדר זבד הבת': 'זבד הבת',
+    'לשבת חתן': 'שבת חתן',
+  };
+  // קדיש: the opening line (possibly behind a short label such as "קדיש יתום"
+  // or "חזן") and the lines that continue it.
+  var KADDISH_OPEN_RE = /^.{0,30}?יתגדל ויתקדש/;
+  var KADDISH_CONT_RE = /^(?:לעלא|על ישראל ועל רבנן|יהא שלמא רבא|עושה שלום במרומיו|תתקבל|יהא שמה רבא|יתברך וישתבח|ואמרו אמן|יהי שם יהוה מברך)/;
+  // A short instruction that merely *names* a קדיש ("חצי קדיש", "קדיש תתקבל",
+  // "ואומרים קדיש על ישראל"). The length guard keeps real halachic notes that
+  // happen to mention קדיש from being treated as the קדיש itself.
+  var KADDISH_LABEL_RE = /קדיש/;
+  // A line said by the חזן or answered by the ציבור. Hebrew letters are not \w,
+  // so the boundary after the role name must be spelled out — \b never matches
+  // between a Hebrew letter and a space.
+  var CHAZAN_LINE_RE = /^(?:ואומרים|ואומר|ויאמר|וחוזר|ועונים|אומרים|אומר|וקורא|מכריז)?\s*(?:ה?חזן|ה?קהל|ה?ציבור|ה?שץ|שליח הציבור|הכהנים)(?=\s|$)/;
+  // ברכו and its response. Matched anywhere inside a SHORT segment, so wrappers
+  // like "ואומר החזן ברכו…" / "העולה מברך ברכו…" are covered, while the phrase
+  // inside a long passage (e.g. "שיר המעלות … הנה ברכו את ה'") is not.
+  var BARCHU_RE = /ברכו את (?:יהוה|השם|ה|הי) המברך|ברוך (?:יהוה|השם|ה|הי) המברך לעולם ועד/;
+  var BARCHU_MAX_LEN = 60;
+
+  // Strip HTML tags, nikud/te'amim and Hebrew punctuation → a comparable key.
+  function plain(s) {
+    return String(s == null ? '' : s)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\p{Mn}/gu, '')
+      .replace(/[׳״'"״,:.־׀׃׳״()\[\]]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function sectionLabel(headerText) {
+    return MINYAN_ONLY_SECTIONS[plain(headerText)] || null;
+  }
+
+  // Mark every segment that may only be said with a מניין.
+  // Returns { drop: bool[], note: (string|null)[] } — note[i] holds the label for
+  // the first dropped segment of each run (the one that gets the muted line).
+  function markMinyanOnly(segs) {
+    var drop = [], note = [], i, sectionSkip = null, inKaddish = false;
+    for (i = 0; i < segs.length; i++) { drop.push(false); note.push(null); }
+
+    for (i = 0; i < segs.length; i++) {
+      var s = segs[i], txt = plain(s.text);
+
+      if (s.kind === 'header') {
+        var lbl = sectionLabel(s.text);
+        inKaddish = false;
+        if (lbl) {
+          // A new minyan-only section: note it only when it opens a fresh run,
+          // so consecutive minyan sections collapse into a single note.
+          if (sectionSkip === null) note[i] = lbl;
+          else if (sectionSkip !== lbl) note[i] = lbl;
+          sectionSkip = lbl;
+          drop[i] = true;
+          continue;
+        }
+        sectionSkip = null;            // a normal header ends the skipped run
+      }
+      if (sectionSkip !== null) { drop[i] = true; continue; }
+
+      if (s.kind === 'instruction' && KADDISH_LABEL_RE.test(txt) && txt.length <= 60) {
+        drop[i] = true; inKaddish = true;
+        note[i] = 'קדיש';
+        continue;
+      }
+      if (KADDISH_OPEN_RE.test(txt)) {
+        drop[i] = true;
+        if (!inKaddish) note[i] = 'קדיש';
+        inKaddish = true;
+        continue;
+      }
+      if (inKaddish && KADDISH_CONT_RE.test(txt)) { drop[i] = true; continue; }
+      inKaddish = false;
+
+      if (txt.length <= BARCHU_MAX_LEN && BARCHU_RE.test(txt)) {
+        drop[i] = true; note[i] = 'ברכו'; continue;
+      }
+      // A PRAYER LINE said by the חזן or answered by the ציבור, with the role
+      // inline ("וחוזר החזן: ה' אלהיכם אמת"). Rubric-only markers ("חזן:",
+      // "קהל ואחריו שליח הציבור:") are left to the pass below, so a marker whose
+      // text stays (e.g. inside סליחות) keeps its heading.
+      if (s.kind !== 'header' && s.kind !== 'instruction' && CHAZAN_LINE_RE.test(txt)) {
+        drop[i] = true;
+        continue;
+      }
+    }
+
+    // A bare "חזן:" / "קהל וחזן:" label is only meaningful together with the
+    // line it introduces; drop it when that line is dropped.
+    for (i = segs.length - 2; i >= 0; i--) {
+      if (drop[i] || segs[i].kind !== 'instruction') continue;
+      if (drop[i + 1] && CHAZAN_LINE_RE.test(plain(segs[i].text))) drop[i] = true;
+    }
+    // Notes deliberately stay on their own segment: the renderer collects them
+    // per dropped run, and each note is announced only if THAT segment's cond
+    // applies today (moving a note elsewhere would announce e.g. הפטרה של תשעה
+    // באב on an ordinary Monday).
+    return { drop: drop, note: note };
   }
 
   // Mirrors render.js: wrap the first visible word so it can be enlarged,
@@ -165,9 +299,34 @@
   // Render a flat seg list ({kind,text,cond?}) → { html, nav }.
   function renderSegs(segs, dayFlags) {
     var hasF = makeHas(dayFlags);
-    var out = [], nav = [], n = 0;
+    // 'with_minyan' is added by the flag engine from the user's profile
+    // (js/calendar.js) — absent means "מתפלל ביחידות".
+    var noMinyan = !hasF('with_minyan');
+    var mark = noMinyan ? markMinyanOnly(segs) : null;
+    var out = [], nav = [], n = 0, pending = [];
+    function flushMinyanNote() {
+      if (!pending.length) return;
+      var many = pending.length > 1;
+      var names = many
+        ? pending.slice(0, -1).join(', ') + ' ו' + pending[pending.length - 1]
+        : pending[0];
+      out.push('<div class="s-minyan-note">' + esc(names) +
+        (many ? ' — נאמרים במניין בלבד' : ' — נאמר במניין בלבד') + '</div>');
+      pending = [];
+    }
     for (var i = 0; i < segs.length; i++) {
       var s = segs[i];
+      if (mark && mark.drop[i]) {
+        // Collect the labels of this dropped run; they're flushed as ONE muted
+        // line when the run ends, so חזרת הש"ץ + קדושה + מודים דרבנן + ברכת
+        // כהנים read as a single note instead of four. Only sections that apply
+        // today are announced (e.g. הפטרה of תשעה באב stays silent otherwise).
+        if (mark.note[i] && condPasses(s.cond, hasF) && pending.indexOf(mark.note[i]) < 0) {
+          pending.push(mark.note[i]);
+        }
+        continue;
+      }
+      flushMinyanNote();
       // Seasonal (winter/summer) blocks in the services always carry an explicit
       // cond tag (winterTal/summerTal for גבורות, winterBracha/summerBracha for
       // ברכת השנים), so gating is done purely via condPasses — the block kind is
@@ -186,6 +345,7 @@
         out.push('<div class="s-seg">' + renderTextBlock(s.text, true) + '</div>');
       }
     }
+    flushMinyanNote();
     return { html: out.join('\n'), nav: nav };
   }
 

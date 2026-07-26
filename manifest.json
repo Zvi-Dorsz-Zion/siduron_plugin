@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "com.moshenahari.siduron",
   "name": "סידורון",
-  "version": "3.5.1",
+  "version": "3.6.0",
   "description": "סידור חכם",
   "author": "y.pl",
   "homepage": "https://github.com/",
@@ -33,7 +33,7 @@
       "order": 300,
       "allowOrderBeforeBuiltIns": false,
       "defaultPinned": true,
-      "iconName": "book_24_regular"
+      "iconName": "book_open_24_regular"
     }
   }
 }

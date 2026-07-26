@@ -226,6 +226,7 @@ body { overflow: hidden; }
 .settings-row.toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .settings-row-title    { font-size: 1rem; }
 .settings-row-subtitle { font-size: .8rem; color: var(--c-on-surface-variant); margin-top: 2px; }
+.settings-row-subtitle.warn { color: var(--c-error); }
 
 /* Connected segmented control, full-width (narrow-layout SegmentedSettingsTile) */
 .segmented {
@@ -345,6 +346,14 @@ body { overflow: hidden; }
 .s-special {
   margin: 8px 0; padding: 6px 12px; border-radius: var(--radius-sm);
   background: var(--c-primary-subtle); border-inline-start: 3px solid var(--c-primary);
+}
+/* Marks a section skipped because it may only be said with a מניין — the reader
+   sees why a familiar part is missing instead of an unexplained gap. */
+.s-minyan-note {
+  font-family: var(--ui-font); font-size: .78em; color: var(--c-on-surface-variant);
+  margin: 10px 0; padding: 5px 12px; border-radius: var(--radius-sm);
+  background: var(--c-surface-container); border: 1px dashed var(--c-outline-variant);
+  text-align: center;
 }
 
 /* ── Utilities ── */
